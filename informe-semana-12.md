@@ -1,14 +1,15 @@
-# Práctica: Contenerización de Arquitectura de Microservicios para Sistema de Cuestionarios con Docker
+
+# Práctica: Contenerización de Arquitectura de Microservicios para Examen de Ubicación de Inglés
 
 ## 1. Título  
-**Contenerización de microservicios para sistema de cuestionarios con API Gateway y servicio descubridor usando Docker**
+**Contenerización de microservicios para una aplicación de examen de ubicación de inglés con API Gateway y servicio descubridor usando Docker**
 
 ## 2. Tiempo de duración  
 **120 minutos**
 
 ## 3. Fundamentos  
 
-Esta práctica busca aplicar una arquitectura de microservicios a un sistema de cuestionarios, donde cada microservicio gestiona una responsabilidad clara: usuarios y roles, cuestionarios, preguntas, respuestas y catálogos. Se implementan servicios independientes, desplegables y escalables, registrados en un servicio descubridor (Eureka) y expuestos mediante un API Gateway. Se usan contenedores Docker para cada microservicio, el gateway y el descubridor, y `docker-compose` para orquestar la comunicación dentro de una red compartida. Se utiliza PostgreSQL como base de datos en cada servicio.
+Esta práctica aplica los principios de arquitectura de microservicios a una aplicación práctica de examen de ubicación de inglés. Cada microservicio gestiona una responsabilidad específica, como la administración de usuarios, la creación de cuestionarios, la gestión de preguntas y respuestas, y los catálogos del sistema. Para garantizar una comunicación eficiente entre servicios, se incorpora un servicio descubridor (Eureka) y un API Gateway que enruta las peticiones del cliente. Todos los servicios son contenerizados con Docker y orquestados mediante Docker Compose, asegurando independencia, escalabilidad y facilidad de despliegue. La base de datos utilizada es PostgreSQL.
 
 ## 4. Conocimientos previos
 
@@ -17,24 +18,24 @@ Esta práctica busca aplicar una arquitectura de microservicios a un sistema de 
 - Conocimiento básico de APIs REST (preferible NestJS o Spring Boot).
 - Manejo básico de PostgreSQL.
 - Conceptos de API Gateway y servicio descubridor (Eureka, Consul).
-- Manejo de terminal y comandos Docker.
+- Comandos básicos en terminal.
 
 ## 5. Objetivos a alcanzar
 
-- Crear microservicios independientes para cada módulo (usuario, cuestionario, pregunta, respuesta, catálogo).
-- Implementar un servicio descubridor para registro dinámico de microservicios.
-- Implementar un API Gateway para unificar puntos de acceso.
-- Contenerizar cada microservicio, el gateway y el descubridor con Docker.
-- Orquestar los contenedores con `docker-compose` para que se comuniquen dentro de una red Docker.
+- Implementar microservicios independientes para el sistema de examen.
+- Usar un servicio descubridor para registrar dinámicamente los microservicios.
+- Implementar un API Gateway como punto de entrada único.
+- Contenerizar todos los servicios con Docker.
+- Orquestar y comunicar los servicios mediante Docker Compose.
 
 ## 6. Equipo necesario
 
-- Docker y `docker-compose` instalados.
-- Node.js con NestJS (o Java con Spring Boot).
-- Editor de código (Visual Studio Code recomendado).
-- Navegador web para probar endpoints.
-- PostgreSQL instalado o contenedor para base de datos.
-- Conexión a internet para descargar imágenes base.
+- Docker y `docker-compose`.
+- Node.js y NestJS o Java y Spring Boot.
+- Editor de código (Visual Studio Code).
+- PostgreSQL (como contenedor).
+- Navegador web moderno.
+- Conexión a internet.
 
 ## 7. Material de apoyo
 
@@ -46,23 +47,21 @@ Esta práctica busca aplicar una arquitectura de microservicios a un sistema de 
 
 ## 8. Procedimiento
 
-### Paso 1: Definir microservicios y base de datos
+### Paso 1: Definir microservicios y sus dominios
 
-- `auth-service`: maneja usuarios, roles, estados.
-- `cuestionario-service`: maneja cuestionarios y asignaciones.
-- `pregunta-service`: maneja preguntas y tipos.
-- `respuesta-service`: maneja respuestas y respuestas de usuario.
-- `catalogo-service`: maneja datos comunes (estado, tipo acceso, tipo pregunta).
-- `discovery-service`: servicio Eureka para descubrimiento.
-- `api-gateway`: API Gateway para enrutamiento de peticiones.
+- `auth-service`: usuarios, roles, estados.
+- `cuestionario-service`: creación y asignación de exámenes.
+- `pregunta-service`: preguntas y tipos de pregunta.
+- `respuesta-service`: respuestas disponibles y respuestas dadas por los estudiantes.
+- `catalogo-service`: acceso a catálogos como tipo de pregunta, tipo de acceso y estado.
+- `discovery-service`: Eureka como servicio de descubrimiento.
+- `api-gateway`: acceso unificado mediante Spring Cloud Gateway.
 
-Cada servicio tendrá su propia base de datos PostgreSQL o esquema separado.
+Cada microservicio tiene su propia base de datos PostgreSQL.
 
----
+### Paso 2: Crear microservicio base (auth-service con NestJS)
 
-### Paso 2: Crear un microservicio base 
-
-**Archivo principal:** `auth-service/src/main.ts` (NestJS)
+**Archivo principal:** `auth-service/src/main.ts`
 
 ```ts
 import { NestFactory } from '@nestjs/core';
@@ -70,14 +69,15 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api/auth');
   await app.listen(3001);
 }
 bootstrap();
-
-# Dockerfile para auth-service
 ```
-```dockerfile  
+
+**Dockerfile para auth-service**
+
+```dockerfile
 FROM node:18-alpine
 WORKDIR /app
 COPY package*.json ./
@@ -86,57 +86,47 @@ COPY . .
 RUN npm run build
 EXPOSE 3001
 CMD ["node", "dist/main.js"]
+```
 
+### Paso 3: Configurar el servicio descubridor (Eureka Server)
 
-# Paso 3: Configurar servicio descubridor 
-
-Crear proyecto Eureka Server que escuche en el puerto **8761**.
-
-Configurar para que otros servicios se registren en:  
-`http://discovery-service:8761/eureka/`
-
----
-
-## Dockerfile discovery-service
+**Dockerfile para discovery-service (Spring Boot)**
 
 ```dockerfile
 FROM openjdk:17-jdk-alpine
 VOLUME /tmp
 COPY target/discovery-service.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app.jar"]
 EXPOSE 8761
-
 ```
-# Paso 4: Configurar API Gateway
 
-Configurar rutas a servicios con balanceo de carga y descubrimiento.
-
-Ejemplo de configuración en `application.yml` (Spring Cloud Gateway):
+### Paso 4: Configurar el API Gateway
 
 ```yaml
 spring:
   cloud:
     gateway:
       routes:
-      - id: auth-service
-        uri: lb://AUTH-SERVICE
-        predicates:
-        - Path=/api/auth/**
-      - id: cuestionario-service
-        uri: lb://CUESTIONARIO-SERVICE
-        predicates:
-        - Path=/api/cuestionarios/**
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/auth/**
+        - id: cuestionario-service
+          uri: lb://CUESTIONARIO-SERVICE
+          predicates:
+            - Path=/api/cuestionarios/**
 ```
-# Dockerfile para api-gateway
+
+**Dockerfile del API Gateway**
 
 ```dockerfile
 FROM openjdk:17-jdk-alpine
 COPY target/api-gateway.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app.jar"]
 EXPOSE 8080
-
 ```
-# Paso 5: Crear archivo docker-compose.yml
+
+### Paso 5: Crear archivo `docker-compose.yml`
 
 ```yaml
 version: '3.8'
@@ -171,8 +161,6 @@ services:
     networks:
       - microservices-net
 
-  # Se repetiría para los demás servicios: cuestionario-service, pregunta-service, respuesta-service, catalogo-service
-
   auth-db:
     image: postgres:15
     environment:
@@ -190,7 +178,15 @@ networks:
 volumes:
   auth_db_data:
 ```
-# 10. Bibliografía
+
+## 9. Resultados esperados
+
+- Eureka muestra el registro dinámico de los microservicios.
+- El API Gateway enruta las solicitudes correctamente.
+- Cada microservicio puede ser escalado y actualizado individualmente.
+- Los contenedores se comunican de forma eficiente.
+
+## 10. Bibliografía
 
 - [Docker Docs](https://docs.docker.com/)
 - [NestJS Docs](https://docs.nestjs.com/)
@@ -198,8 +194,6 @@ volumes:
 - [API Gateway Pattern](https://microservices.io/patterns/apigateway.html)
 - [PostgreSQL Docs](https://www.postgresql.org/docs/)
 
-```
-```
-# 11. Link del Audio
-[PostgreSQL Docs](https://www.postgresql.org/docs/)
-```
+## 11. Link del Audio
+
+🔊 [Escuchar audio explicativo](https://drive.google.com/file/d/1eh816_bAnXiLLvH-hgmV0KXTkIRPQ6qG/view?usp=sharing)
