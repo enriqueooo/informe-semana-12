@@ -75,4 +75,132 @@ async function bootstrap() {
 }
 bootstrap();
 
+# Dockerfile para auth-service
+```
+```dockerfile
+```
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+EXPOSE 3001
+CMD ["node", "dist/main.js"]
+
+
+# Paso 3: Configurar servicio descubridor (Eureka)
+
+Crear proyecto Eureka Server que escuche en el puerto **8761**.
+
+Configurar para que otros servicios se registren en:  
+`http://discovery-service:8761/eureka/`
+
+---
+
+## Dockerfile discovery-service
+
+```dockerfile
+FROM openjdk:17-jdk-alpine
+VOLUME /tmp
+COPY target/discovery-service.jar app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
+EXPOSE 8761
+
+```
+# Paso 4: Configurar API Gateway
+
+Configurar rutas a servicios con balanceo de carga y descubrimiento.
+
+Ejemplo de configuración en `application.yml` (Spring Cloud Gateway):
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+      - id: auth-service
+        uri: lb://AUTH-SERVICE
+        predicates:
+        - Path=/api/auth/**
+      - id: cuestionario-service
+        uri: lb://CUESTIONARIO-SERVICE
+        predicates:
+        - Path=/api/cuestionarios/**
+```
+# Dockerfile para api-gateway
+
+```dockerfile
+FROM openjdk:17-jdk-alpine
+COPY target/api-gateway.jar app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
+EXPOSE 8080
+
+```
+# Paso 5: Crear archivo docker-compose.yml
+
+```yaml
+version: '3.8'
+
+services:
+  discovery-service:
+    build: ./discovery-service
+    ports:
+      - "8761:8761"
+    networks:
+      - microservices-net
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - discovery-service
+    networks:
+      - microservices-net
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3001:3001"
+    depends_on:
+      - discovery-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - DB_HOST=auth-db
+      - DB_PORT=5432
+    networks:
+      - microservices-net
+
+  # Se repetiría para los demás servicios: cuestionario-service, pregunta-service, respuesta-service, catalogo-service
+
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices-net
+
+networks:
+  microservices-net:
+
+volumes:
+  auth_db_data:
+```
+# 10. Bibliografía
+
+- [Docker Docs](https://docs.docker.com/)
+- [NestJS Docs](https://docs.nestjs.com/)
+- [Spring Cloud Netflix Eureka](https://spring.io/projects/spring-cloud-netflix)
+- [API Gateway Pattern](https://microservices.io/patterns/apigateway.html)
+- [PostgreSQL Docs](https://www.postgresql.org/docs/)
+
+```
+```
+# 11. Link del Audio
+[PostgreSQL Docs](https://www.postgresql.org/docs/)
 ```
