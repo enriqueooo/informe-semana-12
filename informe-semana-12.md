@@ -60,7 +60,7 @@ Cada servicio tendrá su propia base de datos PostgreSQL o esquema separado.
 
 ---
 
-### Paso 2: Crear un microservicio base (ejemplo auth-service)
+### Paso 2: Crear un microservicio base 
 
 **Archivo principal:** `auth-service/src/main.ts` (NestJS)
 
@@ -89,7 +89,7 @@ EXPOSE 3001
 CMD ["node", "dist/main.js"]
 
 
-# Paso 3: Configurar servicio descubridor (Eureka)
+# Paso 3: Configurar servicio descubridor 
 
 Crear proyecto Eureka Server que escuche en el puerto **8761**.
 
